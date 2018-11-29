@@ -6,11 +6,12 @@ import {
 	IMAGE_STORAGE_BUCKET as S3_BUCKET,
 	IMAGE_STORAGE_ENDPOINT,
 	IMAGE_STORAGE_FORCE_PATH_STYLE,
+	IMAGE_STORAGE_AUTH_STYLE,
 } from '../../config';
 
 export const getKey = (...parts: string[]): string => parts.join('/');
 
-class UnauthenticatedS3Facade {
+class S3Facade {
 	constructor(private s3Client: AWS.S3) {}
 
 	headObject(
@@ -32,13 +33,19 @@ class UnauthenticatedS3Facade {
 	}
 }
 
-const s3Client = new UnauthenticatedS3Facade(
-	new AWS.S3({
-		endpoint: IMAGE_STORAGE_ENDPOINT,
-		s3ForcePathStyle: IMAGE_STORAGE_FORCE_PATH_STYLE,
-		signatureVersion: 'v4',
-	}),
-);
+let clientProps: AWS.S3.Types.ClientConfiguration = {
+	endpoint: IMAGE_STORAGE_ENDPOINT,
+	s3ForcePathStyle: IMAGE_STORAGE_FORCE_PATH_STYLE,
+	signatureVersion: 'v4',
+};
+if (IMAGE_STORAGE_AUTH_STYLE === 'SIGV4') {
+	clientProps = {
+		credentialProvider: new AWS.CredentialProviderChain(),
+		...clientProps,
+	};
+}
+
+const s3Client = new S3Facade(new AWS.S3(clientProps));
 
 export function getFileInfo(path: string) {
 	const req = s3Client.headObject({
