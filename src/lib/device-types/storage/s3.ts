@@ -11,7 +11,21 @@ import {
 
 export const getKey = (...parts: string[]): string => parts.join('/');
 
-class S3Facade {
+interface S3Facade {
+	headObject(
+		params: AWS.S3.Types.HeadObjectRequest,
+	): ReturnType<AWS.S3['headObject']>;
+
+	getObject(
+		params: AWS.S3.Types.GetObjectRequest,
+	): ReturnType<AWS.S3['getObject']>;
+
+	listObjectsV2(
+		params: AWS.S3.Types.ListObjectsV2Request,
+	): ReturnType<AWS.S3['listObjectsV2']>;
+}
+
+class UnauthenticatedS3 implements S3Facade {
 	constructor(private s3Client: AWS.S3) {}
 
 	headObject(
@@ -33,19 +47,46 @@ class S3Facade {
 	}
 }
 
+class AuthenticatedS3 implements S3Facade {
+	constructor(private s3Client: AWS.S3) {}
+
+	headObject(
+		params: AWS.S3.Types.HeadObjectRequest,
+	): ReturnType<AWS.S3['headObject']> {
+		return this.s3Client.headObject(params);
+	}
+
+	getObject(
+		params: AWS.S3.Types.GetObjectRequest,
+	): ReturnType<AWS.S3['getObject']> {
+		return this.s3Client.getObject(params);
+	}
+
+	listObjectsV2(
+		params: AWS.S3.Types.ListObjectsV2Request,
+	): ReturnType<AWS.S3['listObjectsV2']> {
+		return this.s3Client.listObjectsV2(params);
+	}
+}
+
 let clientProps: AWS.S3.Types.ClientConfiguration = {
 	endpoint: IMAGE_STORAGE_ENDPOINT,
 	s3ForcePathStyle: IMAGE_STORAGE_FORCE_PATH_STYLE,
 	signatureVersion: 'v4',
 };
-if (IMAGE_STORAGE_AUTH_STYLE === 'SIGV4') {
-	clientProps = {
-		credentialProvider: new AWS.CredentialProviderChain(),
-		...clientProps,
-	};
-}
-
-const s3Client = new S3Facade(new AWS.S3(clientProps));
+const s3Client: S3Facade =
+	IMAGE_STORAGE_AUTH_STYLE === 'SIGV4'
+		? new AuthenticatedS3(
+				new AWS.S3({
+					credentialProvider: new AWS.CredentialProviderChain(),
+					...clientProps,
+				}),
+		  )
+		: new UnauthenticatedS3(
+				new AWS.S3({
+					...clientProps,
+				}),
+		  );
 
 export function getFileInfo(path: string) {
 	const req = s3Client.headObject({
