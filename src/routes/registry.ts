@@ -18,7 +18,10 @@ import {
 	AUTH_RESINOS_REGISTRY_CODE,
 	TOKEN_AUTH_BUILDER_TOKEN,
 	REGISTRY2_HOST,
+	REGISTRY_TOKEN_STRATEGY,
 } from '../lib/config';
+
+import * as AWS from 'aws-sdk';
 
 const { UnauthorizedError } = sbvrUtils;
 
@@ -331,6 +334,33 @@ const generateToken = (
 
 export const token: RequestHandler = (req, res) => {
 	const scopes = _.castArray(req.query.scope);
+
+	if (REGISTRY_TOKEN_STRATEGY == 'AWS') {
+		console.log(`Using AWS ECR strategy`);
+		const ecr = new AWS.ECR();
+
+		return Promise.join(
+			getSubject(req),
+			authorizeRequest(req, scopes),
+			(sub, access) => {
+				console.log(`${sub}:${access}:${scopes}`);
+				// TODO: handle socping
+				const resp = ecr.getAuthorizationToken();
+				return resp
+					.promise()
+					.then(authResponse => {
+						const token = authResponse.authorizationData![0];
+						res.send({ token });
+					})
+					.catch(err => {
+						if (handleHttpErrors(req, res, err)) {
+							return;
+						}
+						res.sendStatus(400); // bad request
+					});
+			},
+		);
+	}
 
 	return Promise.join(
 		getSubject(req),

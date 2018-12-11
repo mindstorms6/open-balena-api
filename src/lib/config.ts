@@ -58,6 +58,8 @@ export const IMAGE_STORAGE_FORCE_PATH_STYLE =
 export const JSON_WEB_TOKEN_EXPIRY_MINUTES = intVar(
 	'JSON_WEB_TOKEN_EXPIRY_MINUTES',
 );
+export const REGISTRY_TOKEN_STRATEGY =
+	process.env.REGISTRY_TOKEN_STRATEGY || 'integrated';
 export const JSON_WEB_TOKEN_SECRET = requiredVar('JSON_WEB_TOKEN_SECRET');
 export const MIXPANEL_TOKEN = requiredVar('MIXPANEL_TOKEN');
 export const NODE_ENV = process.env.NODE_ENV;
